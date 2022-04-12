@@ -1,16 +1,25 @@
 [package]
-name = "xtext"
+name = "rabbit"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "xtext"
+name = "rabbit"
 path = "src/lib/lib.rs"
 
 [[bin]]
-name = "xtext-cli"
+name = "rabbit-cli"
 path = "src/cli/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tantivy = "0.17.0"
+jieba-rs = "0.6.4"
+lazy_static = "1.4.0"
+anyhow = "1.0"
+walkdir = "2"
+mime_guess = "2.0.4"
+mime = "0.3.16"
+pandoc = "0.8.9"
+xxhash-rust = {version="0.8.5", features=['const_xxh3']}

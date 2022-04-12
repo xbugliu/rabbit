@@ -5,8 +5,7 @@
 
 extern crate jieba_rs;
 extern crate tantivy;
-#[macro_use]
-extern crate lazy_static;
+use lazy_static::lazy_static;
 
 use tantivy::tokenizer::{BoxTokenStream, Token, TokenStream, Tokenizer};
 
