@@ -23,3 +23,4 @@ mime_guess = "2.0.4"
 mime = "0.3.16"
 pandoc = "0.8.9"
 xxhash-rust = {version="0.8.5", features=['const_xxh3']}
+log = "0.4.16"

@@ -24,14 +24,17 @@ pub fn recursive_index(index: &mut index::IndexServer, dir: &str) {
 
     let walker = WalkDir::new(dir).into_iter();
     for entry in walker.filter_entry(|e| !is_hidden(e)) {
-
         let entry = entry.as_ref().unwrap();
+        if entry.file_type().is_dir() {
+            continue;
+        }
         let path = entry.path().to_str().unwrap();
         let doc_mime = doc::is_document_file(path);
         if doc_mime.is_ok() {
             let doc_mime = &doc_mime.unwrap();
             let content = doc::convert_docment_to_plain_text(doc_mime, path);
             if content.is_ok() {
+                log::info!("add doc {}, mime: {}", path, doc_mime.to_string());
                 let mtime = entry.metadata().unwrap().modified().unwrap();
                 let mtime = mtime
                                      .duration_since(UNIX_EPOCH)

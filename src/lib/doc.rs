@@ -3,11 +3,11 @@ use mime::Mime;
 use xxhash_rust::const_xxh3::xxh3_64 as const_xxh3;
 
 pub struct Document {
-    filename: String,
-    signature: u64,
-    body: String,
-    mtime: u64,
-    mime_type: u16,   
+    pub filename: String,
+    pub signature: u64,
+    pub body: String,
+    pub mtime: u64,
+    pub mime_type: u64,   
 }
 
 pub fn is_document_file(path: &str) -> Result<Mime> {
