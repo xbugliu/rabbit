@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::mpsc::channel;
@@ -43,19 +43,22 @@ fn is_hidden(entry: &DirEntry) -> bool {
          .unwrap_or(false)
 }
 
-fn make_doc(path: String, doc_mime: &Mime, metadata: &std::fs::Metadata) -> Result<Document> {
+fn make_doc(path: String, doc_mime: &Mime, mtime_secs: u64) -> Result<Document> {
     let content = doc::convert_docment_to_plain_text(doc_mime, &path);
     if content.is_ok() {
         log::info!("add doc {}, mime: {}", path, doc_mime.to_string());
-        let mtime = metadata.modified().unwrap();
-        let mtime = mtime
-                                .duration_since(UNIX_EPOCH)
-                                .expect("Time went backwards");
-        doc::make_index_document(&path, mtime.as_secs(),  doc_mime,content.unwrap())
+        doc::make_index_document(&path, mtime_secs,  doc_mime,content.unwrap())
     }else {
         log::error!("convert file: {} err: {}", path, content.err().unwrap());
         Err(anyhow!("convert error"))
     }
+}
+
+fn get_mtime_secs(entry: &DirEntry) -> u64 {
+    let metadata = entry.metadata().unwrap();
+    let mtime = metadata.modified().unwrap();
+    mtime.duration_since(UNIX_EPOCH)
+                            .expect("Time went backwards").as_secs()
 }
 
 pub fn recursive_index(index: index::IndexServer, dir: &str) {
@@ -64,6 +67,7 @@ pub fn recursive_index(index: index::IndexServer, dir: &str) {
     let thread_pool = ThreadPool::new(8);
     let (tx, rx) = channel();
     let mut index = index;
+    let index_reader = index.get_view();
 
     let child = thread::spawn(move || {
         let mut index_count = 0;
@@ -87,13 +91,17 @@ pub fn recursive_index(index: index::IndexServer, dir: &str) {
         }
         
         let path = String::from(entry.path().to_str().unwrap());
+        let mtime_secs = get_mtime_secs(entry);
+        if index_reader.check_doc_exist_by_signature(doc::get_docment_signature(&path, mtime_secs)).is_ok() {
+            log::info!("doc already indexed: {}", path);
+            continue;
+        }
         let doc_mime = doc::is_document_file(&path);
-        let metadata = entry.metadata().unwrap();
         if doc_mime.is_ok() {
             index_stat.total_count.fetch_add(1, Ordering::Relaxed);
             let tx = tx.clone();
             thread_pool.execute(move||{
-                let doc = make_doc(path, &doc_mime.unwrap(), &metadata);
+                let doc = make_doc(path, &doc_mime.unwrap(), mtime_secs);
                 if doc.is_ok() {
                     tx.send(doc.unwrap());
                 }

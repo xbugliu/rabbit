@@ -3,7 +3,7 @@ use tantivy::collector::TopDocs;
 use tantivy::query::{QueryParser, TermQuery};
 use tantivy::schema::{Schema, TEXT, FAST, STORED, STRING, INDEXED, Field, TextOptions, IndexRecordOption, TextFieldIndexing};
 use tantivy::{Index, ReloadPolicy, TantivyError, IndexWriter, Term};
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use log::{debug, error, info, warn};
 use crate::doc::Document;
 use crate::tantivy_jieba;
@@ -18,11 +18,17 @@ pub struct  SearchResult {
     pub paths: Vec<String>
 }
 
+pub struct IndexServerView {
+    index: Index,
+    schema: Schema,
+}
+
 impl IndexServer {
     pub fn new(dir: &str) -> Result<IndexServer>  {
         let mut schema_builder = Schema::builder();
         schema_builder.add_text_field("filename", STRING | STORED);
         schema_builder.add_u64_field("signature", INDEXED);
+        schema_builder.add_u64_field("id", INDEXED);
 
         let text_field_indexing = TextFieldIndexing::default()
             .set_tokenizer("jie_ba")
@@ -88,31 +94,10 @@ impl IndexServer {
     }
 
     pub fn add_update_doc(&mut self, doc: Document)  { 
-
-        let reader = self.index
-            .reader_builder()
-            .reload_policy(ReloadPolicy::OnCommit)
-            .try_into();
-
-        if reader.is_err() {
-            let err = reader.err().unwrap();
-            log::error!("add_update_doc err: {}", err.to_string());
-            return;
-        }
-        let reader = reader.unwrap();
-        let searcher = reader.searcher();
-        let query = TermQuery::new(
-            Term::from_field_u64(self.schema.get_field("signature").unwrap(), doc.signature),
-            IndexRecordOption::Basic,
-        );
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(1)).unwrap();
-        if top_docs.len() > 0 {
-            return;
-        }
-
         let mut d = tantivy::schema::Document::default();
         d.add_field_value(self.get_field("filename"), doc.filename.as_str());
         d.add_field_value(self.get_field("signature"), doc.signature);
+        d.add_field_value(self.get_field("id"), doc.id);
         d.add_field_value(self.get_field("body"), doc.body);
         d.add_field_value(self.get_field("mtime"), doc.mtime);
         d.add_field_value(self.get_field("mime_type"), doc.mime_type);
@@ -124,8 +109,14 @@ impl IndexServer {
         };
     }
 
-    pub fn del_doc(&mut self, doc_signature: u64) {
-        let term = Term::from_field_u64(self.schema.get_field("signature").unwrap(), doc_signature);
+    pub fn del_doc_id(&mut self, id: u64) {
+        let term = Term::from_field_u64(self.schema.get_field("id").unwrap(), id);
+        self.writer.delete_term(term);
+        self.writer.commit();
+    }
+
+    pub fn del_doc_signature(&mut self, signature: u64) {
+        let term = Term::from_field_u64(self.schema.get_field("signature").unwrap(), signature);
         self.writer.delete_term(term);
         self.writer.commit();
     }
@@ -133,4 +124,32 @@ impl IndexServer {
     pub fn commit(&mut self) {
         self.writer.commit();
     }
+
+    pub fn get_view(&self) -> IndexServerView {
+        IndexServerView{index: self.index.clone(), schema: self.schema.clone()}
+    }
+}
+
+impl IndexServerView {
+    pub fn check_doc_exist_by_signature(&self, signature: u64) -> Result<()> {
+        self.is_doc_exist("signature", signature)
+    }
+
+    fn is_doc_exist(&self, field_name: &str, field_val: u64) -> Result<()> {
+        let reader = self.index
+        .reader_builder()
+        .reload_policy(ReloadPolicy::OnCommit)
+        .try_into()?;
+
+        let searcher = reader.searcher();
+        let query = TermQuery::new(
+            Term::from_field_u64(self.schema.get_field(field_name).unwrap(), field_val),
+            IndexRecordOption::Basic,
+        );
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(1)).unwrap();
+        if top_docs.len() == 0 {
+            return Err(anyhow!("not exist!"));
+        }
+        return Ok(())
+    }    
 }
