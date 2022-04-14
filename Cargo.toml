@@ -26,6 +26,7 @@ log = "0.4.16"
 dirs = "4.0.0"
 tracing = "0.1.29"
 tracing-appender = "0.2.0"
+threadpool = "1.8.1"
 tracing-subscriber = { version = "0.3.3" }
 clap = { version = "3.0", features = ["derive"] }
 xxhash-rust = {version="0.8.5", features=['const_xxh3']}
