@@ -34,10 +34,11 @@ fn init_logger(dir: &str) -> tracing_appender::non_blocking::WorkerGuard {
         .with_timer(tracing_subscriber::fmt::time::time());
 
     tracing_subscriber::fmt()
-        .with_writer(non_blocking) // 写入文件，将覆盖上面的标准输出
-        .with_ansi(false)  // 如果日志是写入文件，应将ansi的颜色输出功能关掉
+        // .with_max_level(tracing::Level::TRACE)
+        .with_writer(non_blocking) 
+        .with_ansi(false)  
         .event_format(format)
-        .init();  // 初始化并将SubScriber设置为全局SubScriber
+        .init();  
 
     _guard
 }

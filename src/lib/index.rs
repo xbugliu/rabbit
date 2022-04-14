@@ -1,8 +1,10 @@
+use std::time::Instant;
 use tantivy::collector::TopDocs;
 use tantivy::query::{QueryParser, TermQuery};
 use tantivy::schema::{Schema, TEXT, FAST, STORED, STRING, INDEXED, Field, TextOptions, IndexRecordOption, TextFieldIndexing};
 use tantivy::{Index, ReloadPolicy, TantivyError, IndexWriter, Term};
 use anyhow::Result;
+use log::{debug, error, info, warn};
 use crate::doc::Document;
 use crate::tantivy_jieba;
 
@@ -24,7 +26,7 @@ impl IndexServer {
 
         let text_field_indexing = TextFieldIndexing::default()
             .set_tokenizer("jie_ba")
-            .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+            .set_index_option(IndexRecordOption::Basic);
         let text_options = TextOptions::default()
             .set_indexing_options(text_field_indexing);
 
@@ -56,16 +58,24 @@ impl IndexServer {
             .try_into()?;
 
         let query_parser = QueryParser::for_index(&self.index, vec![self.get_field("body")]);
+        let now = Instant::now();
         let query = query_parser.parse_query(&querycontent)?;
-
+        info!("parse_query cost={}", now.elapsed().as_millis());
+        
         let searcher = reader.searcher();
+
+        let now = Instant::now();
         let top_docs = searcher.search(&query, &TopDocs::with_limit(100))?;
+        info!("search cost={}", now.elapsed().as_millis());
+        let now = Instant::now();
+
         let mut paths = Vec::new();
         for (_score, doc_address) in top_docs {
             let retrieved_doc = searcher.doc(doc_address)?;
             let path = retrieved_doc.get_first(self.get_field("filename")).unwrap();
             paths.push(String::from(path.as_text().unwrap()))
         };
+        info!("load docs cost={}", now.elapsed().as_millis());
 
         Ok(SearchResult{
             paths: paths
@@ -101,13 +111,17 @@ impl IndexServer {
         }
 
         let mut d = tantivy::schema::Document::default();
-        d.add_field_value(self.get_field("filename"), doc.filename);
+        d.add_field_value(self.get_field("filename"), doc.filename.as_str());
         d.add_field_value(self.get_field("signature"), doc.signature);
         d.add_field_value(self.get_field("body"), doc.body);
         d.add_field_value(self.get_field("mtime"), doc.mtime);
         d.add_field_value(self.get_field("mime_type"), doc.mime_type);
         
-        self.writer.add_document(d);
+        let result = self.writer.add_document(d);
+        match result {
+            Err(e) => log::error!("add doc err: {}", e),
+            _ => log::info!("add doc success {}", doc.filename)
+        };
     }
 
     pub fn del_doc(&mut self, doc_signature: u64) {

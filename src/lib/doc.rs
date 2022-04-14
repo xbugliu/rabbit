@@ -25,7 +25,15 @@ pub fn is_document_file(path: &str) -> Result<Mime> {
 }
 
 pub fn convert_docment_to_plain_text(mime: &Mime, path: &str) -> Result<String> {
+    if mime.subtype() ==  mime::PLAIN {
+        let result = std::fs::read_to_string(path);
+        if result.is_err() {
+            return Err(anyhow!(result.err().unwrap()))
+        }
+        return Ok(result.unwrap())
+    }
 
+    log::info!("convert_docment_to_plain_text file={}", path);
     let mut pandoc = pandoc::new();
     pandoc.add_input(path);
     pandoc.set_output(pandoc::OutputKind::Pipe);
