@@ -52,7 +52,7 @@ fn main() -> Result<()> {
 
     let _guard = init_logger(data_path.to_str().unwrap());
     log::info!("begin");
-    let index_server = &mut rabbit::index::IndexServer::new(index_path.to_str().unwrap())?;
+    let index_server = rabbit::index::IndexServer::new(index_path.to_str().unwrap())?;
 
     let args = Cli::parse();
     match &args.command {
