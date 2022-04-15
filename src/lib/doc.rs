@@ -57,7 +57,14 @@ pub fn convert_docment_to_plain_text(mime: &Mime, path: &str) -> Result<String> 
     let mut pandoc = pandoc::new();
     pandoc.add_input(path);
     pandoc.set_output(pandoc::OutputKind::Pipe);
-    let output = pandoc.execute().unwrap();
+    let output = pandoc.execute();
+    let output = match output {
+        Err(err) => return {
+            log::error!("convert {} err: {}", path, err);
+            Err(anyhow!("convert err"))
+        },
+        Ok(res) => res
+    };
     match output {
         pandoc::PandocOutput::ToBuffer(result) => return Ok(result),
         _ => panic!("convert_docment_to_plain_text")
