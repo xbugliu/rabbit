@@ -96,7 +96,7 @@ pub fn recursive_index(index: index::IndexServer, dir: &str) {
             log::info!("doc already indexed: {}", path);
             continue;
         }
-        let doc_mime = doc::is_document_file(&path);
+        let doc_mime = doc::is_support_document_file(&path);
         if doc_mime.is_ok() {
             index_stat.total_count.fetch_add(1, Ordering::Relaxed);
             let tx = tx.clone();
